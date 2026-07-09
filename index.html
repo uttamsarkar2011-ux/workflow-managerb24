@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Schedule Meeting</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; background: #f5f7fa; color: #333; padding: 20px; }
+    h2 { color: #2563eb; margin-bottom: 20px; font-size: 20px; }
+    .form-group { margin-bottom: 15px; }
+    label { display: block; font-size: 13px; font-weight: bold; margin-bottom: 5px; color: #555; }
+    input, select, textarea { width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px; }
+    textarea { height: 80px; resize: vertical; }
+    .btn { background: #2563eb; color: white; border: none; padding: 10px 24px; border-radius: 5px; cursor: pointer; font-size: 14px; width: 100%; margin-top: 5px; }
+    .btn:hover { background: #1d4ed8; }
+    .btn-secondary { background: #6b7280; margin-top: 8px; }
+    .btn-secondary:hover { background: #4b5563; }
+    .msg { margin-top: 15px; padding: 10px; border-radius: 5px; font-size: 13px; display: none; }
+    .msg.success { background: #d1fae5; color: #065f46; display: block; }
+    .msg.error { background: #fee2e2; color: #991b1b; display: block; }
+    .loading { text-align: center; padding: 20px; color: #888; }
+    .row { display: flex; gap: 10px; }
+    .row .form-group { flex: 1; }
+  </style>
+</head>
+<body>
+  <h2>Schedule Meeting</h2>
+  <div id="loading" class="loading">Loading...</div>
+  <div id="form-container" style="display:none">
+    <div class="form-group">
+      <label>Contact / Lead Name</label>
+      <input type="text" id="contact-name" placeholder="Contact name" readonly style="background:#f9f9f9">
+    </div>
+    <div class="row">
+      <div class="form-group">
+        <label>Meeting Date *</label>
+        <input type="date" id="meeting-date" required>
+      </div>
+      <div class="form-group">
+        <label>Meeting Time *</label>
+        <input type="time" id="meeting-time" required>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Duration</label>
+      <select id="meeting-duration">
+        <option value="30">30 minutes</option>
+        <option value="60" selected>1 hour</option>
+        <option value="90">1.5 hours</option>
+        <option value="120">2 hours</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Meeting Title *</label>
+      <input type="text" id="meeting-title" placeholder="e.g. Product Demo, Follow-up Call" required>
+    </div>
+    <div class="form-group">
+      <label>Description</label>
+      <textarea id="meeting-desc" placeholder="Meeting agenda or notes..."></textarea>
+    </div>
+    <div class="form-group">
+      <label>Assigned To</label>
+      <input type="text" id="assigned-to" placeholder="Responsible person">
+    </div>
+    <button class="btn" onclick="scheduleMeeting()">Schedule Meeting</button>
+    <button class="btn btn-secondary" onclick="closeApp()">Cancel</button>
+    <div id="msg" class="msg"></div>
+  </div>
+
+  <script src="//api.bitrix24.com/api/v1/"></script>
+  <script>
+    var APP = {
+      crmEntityType: '',
+      crmEntityId: '',
+      contactName: ''
+    };
+
+    BX24.init(function() {
+      var placement = BX24.placement.info();
+      APP.crmEntityType = placement.options.ENTITY_TYPE || '';
+      APP.crmEntityId = placement.options.ENTITY_ID || '';
+
+      if (APP.crmEntityId) {
+        loadEntityInfo();
+      } else {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('form-container').style.display = 'block';
+      }
+
+      // Set default date to today
+      var today = new Date();
+      var dateStr = today.toISOString().split('T')[0];
+      document.getElementById('meeting-date').value = dateStr;
+      document.getElementById('meeting-time').value = '10:00';
+    });
+
+    function loadEntityInfo() {
+      var method = '';
+      if (APP.crmEntityType === 'CONTACT') method = 'crm.contact.get';
+      else if (APP.crmEntityType === 'LEAD') method = 'crm.lead.get';
+      else if (APP.crmEntityType === 'DEAL') method = 'crm.deal.get';
+      else if (APP.crmEntityType === 'COMPANY') method = 'crm.company.get';
+
+      if (method) {
+        BX24.callMethod(method, { id: APP.crmEntityId }, function(res) {
+          if (!res.error()) {
+            var data = res.data();
+            var name = '';
+            if (APP.crmEntityType === 'CONTACT') name = (data.NAME || '') + ' ' + (data.LAST_NAME || '');
+            else if (APP.crmEntityType === 'LEAD') name = data.TITLE || data.NAME || '';
+            else if (APP.crmEntityType === 'DEAL') name = data.TITLE || '';
+            else if (APP.crmEntityType === 'COMPANY') name = data.TITLE || '';
+            APP.contactName = name.trim();
+            document.getElementById('contact-name').value = APP.contactName;
+            document.getElementById('meeting-title').value = 'Meeting with ' + APP.contactName;
+          }
+          document.getElementById('loading').style.display = 'none';
+          document.getElementById('form-container').style.display = 'block';
+        });
+      } else {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('form-container').style.display = 'block';
+      }
+    }
+
+    function scheduleMeeting() {
+      var date = document.getElementById('meeting-date').value;
+      var time = document.getElementById('meeting-time').value;
+      var title = document.getElementById('meeting-title').value.trim();
+      var desc = document.getElementById('meeting-desc').value.trim();
+      var duration = parseInt(document.getElementById('meeting-duration').value);
+
+      if (!date || !time || !title) {
+        showMsg('Please fill in all required fields.', 'error');
+        return;
+      }
+
+      var startDt = new Date(date + 'T' + time);
+      var endDt = new Date(startDt.getTime() + duration * 60000);
+
+      function pad(n) { return n < 10 ? '0' + n : n; }
+      function formatDt(d) {
+        return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()) +
+               'T' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':00';
+      }
+
+      var activityFields = {
+        OWNER_TYPE_ID: getOwnerTypeId(APP.crmEntityType),
+        OWNER_ID: APP.crmEntityId,
+        TYPE_ID: 1,
+        SUBJECT: title,
+        START_TIME: formatDt(startDt),
+        END_TIME: formatDt(endDt),
+        DESCRIPTION: desc,
+        COMPLETED: 'N',
+        PRIORITY: 2
+      };
+
+      BX24.callMethod('crm.activity.add', { fields: activityFields }, function(res) {
+        if (!res.error()) {
+          showMsg('Meeting scheduled successfully! Activity ID: ' + res.data(), 'success');
+          setTimeout(function() { BX24.closeApplication(); }, 2000);
+        } else {
+          showMsg('Error: ' + res.error_description(), 'error');
+        }
+      });
+    }
+
+    function getOwnerTypeId(type) {
+      var types = { 'LEAD': 1, 'DEAL': 2, 'CONTACT': 3, 'COMPANY': 4 };
+      return types[type] || 3;
+    }
+
+    function showMsg(text, type) {
+      var el = document.getElementById('msg');
+      el.textContent = text;
+      el.className = 'msg ' + type;
+    }
+
+    function closeApp() {
+      BX24.closeApplication();
+    }
+  </script>
+</body>
+</html>
