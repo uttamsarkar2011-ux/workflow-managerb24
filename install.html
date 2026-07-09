@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Schedule Meeting - Install</title>
+  <style>
+    body { font-family: Arial, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #f0f4f8; }
+    .container { background: white; padding: 40px; border-radius: 10px; box-shadow: 0 2px 20px rgba(0,0,0,0.1); text-align: center; max-width: 500px; }
+    h1 { color: #2563eb; }
+    p { color: #555; }
+    .status { margin-top: 20px; padding: 10px; border-radius: 5px; }
+    .success { background: #d1fae5; color: #065f46; }
+    .error { background: #fee2e2; color: #991b1b; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Schedule Meeting</h1>
+    <p>Bitrix24 Application</p>
+    <div id="status" class="status">Installing application...</div>
+  </div>
+  <script>
+    (function() {
+      var params = {};
+      var query = window.location.search.substring(1);
+      query.split('&').forEach(function(part) {
+        var item = part.split('=');
+        if (item.length === 2) params[decodeURIComponent(item[0])] = decodeURIComponent(item[1]);
+      });
+
+      var statusEl = document.getElementById('status');
+
+      if (params['PLACEMENT'] === 'DEFAULT' || !params['event']) {
+        statusEl.className = 'status success';
+        statusEl.textContent = 'Application installed successfully! You can close this window.';
+        return;
+      }
+
+      if (params['event'] === 'ONAPPINSTALL') {
+        statusEl.className = 'status success';
+        statusEl.textContent = 'Schedule Meeting app installed successfully!';
+      } else {
+        statusEl.className = 'status success';
+        statusEl.textContent = 'Application is ready. You can close this window.';
+      }
+    })();
+  </script>
+</body>
+</html>
